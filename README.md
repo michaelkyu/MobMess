@@ -2,7 +2,7 @@ MobMess is a tool for inferring evolutionary relations among plasmid sequences. 
 
 1. Identify a non-redundant subset of plasmids from an input set of plasmid sequences. MobMess aligns every pair of sequences using [MUMmer4](https://mummer4.github.io/), and then clusters sequences that are highly similar along their entire lengths. MobMess then chooses one sequence to represent each cluster.
 
-2. Infer "plasmid systems", an evolutionary phenomenon in which a "backbone plasmid" with core genes acquires accessory genes to form "compound plasmids".
+2. Infer "plasmid systems", which is an evolutionary phenomenon in which a "backbone plasmid" with core genes acquires accessory genes to form "compound plasmids".
 
 Here's a toy diagram of a plasmid system.
 
@@ -34,14 +34,18 @@ Then, activate the new environment
 conda activate mobmess
 ```
 
-Download and install [PlasX](https://github.com/michaelkyu/plasx). MobMess uses utility functions from PlasX.
+Next, download and install [PlasX](https://github.com/michaelkyu/plasx), which has some utility functions that MobMess uses. You do not need to run the conda commands at https://github.com/michaelkyu/PlasX#installation, as the above conda commands already installs the relevant dependencies.
 ```
+# Download the PlasX repository
+# - If you've previously downloaded the repository, skip this command and
+#   just change into the parent directory of where you downloaded it.
 git clone https://github.com/michaelkyu/PlasX.git
+
+# Install PlasX
 pip install ./PlasX
 ```
 
 Finally, download and install MobMess
-
 ```
 git clone https://github.com/michaelkyu/MobMess.git
 pip install ./MobMess
@@ -99,11 +103,11 @@ CGGTAAGCCCTTCCAGCCGGGAGCTGGAGAAAATGGGCAAGACAGAGAAGGAACAGGCTGAAGCCATGAGAAGGTATGTC
 TTTAGAGGATAAGGAACGACAGATGTTCCAGATAGTCCGGTTAATGGATGAACAACAATCTATTAACAAGAAGATAGCCAATCAAATTCCGGTTATTGTACAGAAAAGTGTGCAGGAACAGTCCAAAAAGCCAAAACGAAAAGGTTTCTTAGGCATATTCGGCAAAAAAAAGGAAGTAACTCCAGCAGTATCAACCACTA
 ```
 
-MobMess also requires annotations of which sequences were assembled completely (as a circular DNA element), as opposed to being assembly fragments. This information is used to identify backbone plasmids, which must be complete.
+MobMess also requires annotations of which sequences were assembled completely (as a circular DNA element), as opposed to being assembly fragments. MobMess uses this information to identify backbone plasmids, as it requires backbones to be complete.
 
 
 ```bash
-# - Two-column table, where first column is the contig name and second column indicates which sequences are complete.
+# This is a two-column table, where the first column is the contig name and the second column indicates which sequences are complete.
 # - The second column must contain the strings True/False or the integers 1/0, to represent complete/incomplete, respectively.
 head test-contigs-circular.txt
 ```
