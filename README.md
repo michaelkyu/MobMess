@@ -2,15 +2,15 @@ MobMess is a tool for inferring evolutionary relations among plasmid sequences. 
 
 1. Identify a non-redundant subset of plasmids from an input set of plasmid sequences. MobMess aligns every pair of sequences using [MUMmer4](https://mummer4.github.io/), and then clusters sequences that are highly similar along their entire lengths. MobMess then chooses one sequence to represent each cluster.
 
-2. Infer "plasmid systems", an evolutionary phenomenon in which a "backbone plasmid" with core genes acquires accessory genes to form "compound plasmids". Here's a toy diagram of a plasmid system.
+2. Infer "plasmid systems", an evolutionary phenomenon in which a "backbone plasmid" with core genes acquires accessory genes to form "compound plasmids".
 
-<div>
-<img src="docs/plasmid_system_diagram.png" width="200" />
-</div>
+Here's a toy diagram of a plasmid system.
 
-![plasmid_system_diagram.png](attachment:plasmid_system_diagram.png)
+<p align="center">
+  <img src="docs/plasmid_system_diagram.png" width="250" class="center"/>
+</p>
 
-For a technical explanation of the MobMess algorithm, please see the supplementary methods from the study "The Genetic and Ecological Landscape of Plasmids in the Human Gut" by Michael Yu, Emily Fogarty, A. Murat Eren.
+This README includes a tutorial for inferring plasmid systems. It also includes instructions for reproducing the 1,169 plasmid systems from our study "The Genetic and Ecological Landscape of Plasmids in the Human Gut" by Michael Yu, Emily Fogarty, A. Murat Eren. For a technical explanation of the MobMess algorithm, please see the supplementary methods of this study.
 
 # Installation
 
@@ -53,7 +53,7 @@ In this tutorial, we will use MobMess to organize plasmids into plasmid systems.
 
 **Note that the output files of this tutorial are already in the `test` directory. Running the code in this tutorial will recreate the same files.**
 
-## Preliminary setup of command line
+### Preliminary setup of command line
 
 
 ```bash
@@ -72,7 +72,7 @@ THREADS=4
 
 
 
-## Understanding the format of the input files
+### Understanding the format of the input files
 
 
 We are going to run MobMess on this fasta file of 123 plasmid sequences
@@ -121,7 +121,7 @@ DEN0056_000000000137	1
 DEN0078_000000004762	1
 ```
 
-## Infer plasmid systems
+### Infer plasmid systems
 
 Activate the conda environment where MobMess is installed
 
@@ -174,7 +174,7 @@ mobmess systems \
     --threads $THREADS
 ```
 
-## Understanding the output files
+### Understanding the output files
 
 The above call to `mobmess systems` generated four files with names that start with $PREFIX-mobmess (i.e. `test-contigs-mobmess`). Here we'll see the formats of these files.
 
@@ -286,7 +286,7 @@ PS8	2793	1	TAN0007_000000033080	68390|68605	2	2	DEN0094_000000007794|ISR0810_000
 PS9	2940	1	TAN0005_000000004026	2941	1	1	TAN0007_000000005447
 ```
 
-## Reproduce the table of plasmid systems
+### Reproduce the table of plasmid systems
 
 First, download a fasta file of the 226,194 predicted plasmid sequences
 
@@ -309,7 +309,9 @@ gunzip predicted_plasmids_summary.txt.gz
 ```bash
 # Extract two columns from this table: the contig name and whether it is circular
 grep -v '#' predicted_plasmids_summary.txt | cut -f1,18 | tail -n +2 > predicted_plasmids_circular.txt
+```
 
+```bash
 head predicted_plasmids_circular.txt
 ```
 
