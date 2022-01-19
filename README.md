@@ -10,7 +10,7 @@ Here's a toy diagram of a plasmid system.
   <img src="docs/plasmid_system_diagram.png" width="250" class="center"/>
 </p>
 
-This README includes a tutorial for inferring plasmid systems. It also includes instructions for reproducing the 1,169 plasmid systems from our study "The Genetic and Ecological Landscape of Plasmids in the Human Gut" by Michael Yu, Emily Fogarty, A. Murat Eren. For a technical explanation of the MobMess algorithm, please see the supplementary methods of this study.
+This README includes a tutorial for inferring plasmid systems. It also includes instructions for reproducing the 1,169 plasmid systems from our study ["The Genetic and Ecological Landscape of Plasmids in the Human Gut" by Michael Yu, Emily Fogarty, A. Murat Eren](https://www.biorxiv.org/content/10.1101/2020.11.01.361691v2). For a technical explanation of the MobMess algorithm, please see the supplementary methods of this study.
 
 # Installation
 
@@ -265,7 +265,7 @@ shorter_cluster	longer_cluster
 ```
 
 
-# Reproduce plasmid systems from the study "The Genetic and Ecological Landscape of Plasmids in the Human Gut" by Michael Yu, Emily Fogarty, A. Murat Eren.
+# Reproduce plasmid systems from the study ["The Genetic and Ecological Landscape of Plasmids in the Human Gut" by Michael Yu, Emily Fogarty, A. Murat Eren](https://www.biorxiv.org/content/10.1101/2020.11.01.361691v2).
 In this study, we predicted 226,194 plasmid contigs and then organized them into 1,169 plasmid systems. You can download a precomputed table that describes these plasmid systems.
 
 
