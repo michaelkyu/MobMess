@@ -658,20 +658,14 @@ def run_mummer(fasta, verbose=False, minmatch=None):
     if minmatch is None:
         minmatch = 16
     
-#    with tempfile.NamedTemporaryFile('wt') as infile, tempfile.NamedTemporaryFile('wt') as outfile:
-#    with tempfile.NamedTemporaryFile('wt', delete=False) as infile, tempfile.NamedTemporaryFile('wt', delete=False) as outfile:
-
-#    with tempfile.TemporaryDirectory() as d:
     with utils.TemporaryDirectory() as d:
         infile = os.path.join(d, 'in.fa')
         outfile = os.path.join(d, 'out')
         utils.write_fasta(fasta, infile)        
 
-        # print(infile)
-        # print(outfile)
         utils.run_cmd("""nucmer --maxmatch --minmatch={minmatch} -p {outfile} -t 252 {infile} {infile}""".format(
             infile=infile, outfile=outfile, minmatch=int(minmatch)),
-                      env='mummer', debug=False, verbose=verbose)
+                      debug=False, verbose=verbose)
         aln_blocks = read_mummer_aln_blocks(outfile + '.delta')
 
     return aln_blocks
