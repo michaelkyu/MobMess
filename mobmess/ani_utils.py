@@ -10,10 +10,7 @@ import pandas as pd
 from numba import jit
 import scipy, scipy.sparse
 
-#import seaborn as sns
-
 from mobmess import utils, nb_utils
-#from plasx import circularity
 
 def mash_sketch(inp, out, kmer=None, sketch=None, threads=None):
     """Runs mash sketch. 
@@ -197,7 +194,7 @@ def read_fastANI(similarities_path, file_2_name=None, names=None, nrows=None):
 
     return similarities
 
-def threshold_fastANI(similarities, similarity_threshold, min_alignment_fraction,
+def threshold_ANI(similarities, similarity_threshold, min_alignment_fraction,
                       both_directions_alignment_fraction=None, 
                       calculate_coverage=None,
                       do_remove_unused_categories=None):
@@ -216,8 +213,6 @@ def threshold_fastANI(similarities, similarity_threshold, min_alignment_fraction
     
     # Filter based on min_alignment_fraction
     similarities = similarities[(similarities['coverage'] >= min_alignment_fraction) & (similarities['ANI'] >= similarity_threshold)]
-
-    # display(similarities)
 
     if both_directions_alignment_fraction:
         # Only keep pairs of contigs, where min_alignment_fraction is satisfied in BOTH directions A-->B and B-->A
@@ -267,61 +262,84 @@ def derep_sources(similarities, similarity_threshold, min_alignment_fraction,
         4          AST0002_000000008030     AST0002  1.000000  102.475750      True
 
     """
-    
-    similarities = threshold_fastANI(similarities, similarity_threshold, min_alignment_fraction, both_directions_alignment_fraction=False)
 
+    # Remove pairs of sequences that don't meet the ANI similarity thresholds
+    similarities = threshold_ANI(similarities, similarity_threshold, min_alignment_fraction, both_directions_alignment_fraction=False)
+
+    # Create a scipy.sparse matrix to represent the contig-2-contig network. Matrix entries are set to the 'full_ANI' column,
+    # which is the global version of ANI.
+    # 
     # - query is "child" (or smaller) contig
     # - reference is the "parent" (or larger) contig
     sp_fullANI, rownames, colnames = utils.sparse_pivot(similarities, index='query', columns='reference', values='full_ANI', square=True, rettype='spmatrix', directed=True)
     sp = sp_fullANI > 0
 
-    # 1/11/22: Remove this, as it depends on implementing create_ig() in plasx.utils. But PlasX doesn't need this, so I want to avoid it.
-#    g = utils.sparse_pivot(similarities, index='query', columns='reference', square=True, rettype='ig', directed=True)
-    g_sp, g_rownames, _ = utils.sparse_pivot(similarities, index='query', columns='reference', square=True, rettype='spmatrix', directed=True)
-    g = utils.create_ig(g_sp, weighted=True, directed=True, rownames=g_rownames, colnames=None, square=True)
-    
+    # (Update 1/31/22): Make sure the matrix diagonal is set to 1
+    #
+    # It's possible that a sequence does not have an edge to itself if it has large repetitive regions. Such repeats won't be
+    # aligned to anything after applying MUMmer's delta-filter, and so the coverage/identity will be less than 100%. This can
+    # happen in reference plasmids that have repeat regions. However, all metagenomic-assembled predicted plasmids that we've
+    # examined are always 100% aligned to themselves (i.e. there's an edge), maybe because it's hard to assemble sequences with
+    # big repeats (a typical assembly algorithm would break that sequence into smaller contigs).
+    utils.setdiag(sp, 1)    
+
+    # Create a igraph.Graph object that represents the contig-by-contig network
+    g = utils.sparse_pivot(similarities, index='query', columns='reference', square=True, rettype='ig', directed=True)
+
+    # Do some sanity checks on correctness of the graph
     assert np.all(rownames == g.vs['name']).all()
     if verbose:
-        print('igraph of similarities:')
+        print('igraph.Graph object:')
         print(g.summary())
-    comp = list(g.components(mode='strong'))
-    print('Strongly connected components:', len(comp))
+
+    # Identify the strongly connected components 
+    clusters = list(g.components(mode='strong'))
+    if verbose:
+        print('Strongly connected components:', len(clusters))
 
     # Calculate the in-degree of every contig in its cluster (i.e. how many children it has in the cluster)
-    comp_degrees = pd.Series(utils.as_flat(utils.sp_mask(sp.astype(np.int), blocks=comp).T.dot(np.ones(sp.shape[0], dtype=np.int))), rownames)
-    comp_sumANI = pd.Series(utils.as_flat(utils.sp_mask(sp_fullANI, blocks=comp).T.dot(np.ones(sp.shape[0]))), rownames)
+    clusters_degrees = pd.Series(utils.as_flat(utils.sp_mask(sp.astype(np.int), blocks=clusters).T.dot(np.ones(sp.shape[0], dtype=np.int))), rownames)
+    clusters_sumANI = pd.Series(utils.as_flat(utils.sp_mask(sp_fullANI, blocks=clusters).T.dot(np.ones(sp.shape[0]))), rownames)
 
-    # Get contigs-by-clusters (membership matrix)
-    row, col = zip(*[(v, i) for i, v_list in enumerate(comp) for v in v_list])
+    # Create contigs-by-clusters network (i.e. cluster membership matrix)
+    row, col = zip(*[(v, i) for i, v_list in enumerate(clusters) for v in v_list])
     contig_2_clusters_sp = scipy.sparse.coo_matrix((np.ones(len(row), np.float32), (row, col)))
 
-    # Get clusters-by-clusters (child-to-parent orientation)
+    # Create clusters-by-clusters directed network (with child-to-parent orientation)
     clusters_2_clusters = contig_2_clusters_sp.T.dot(sp.astype(np.float32)).dot(contig_2_clusters_sp).astype(np.int32)
 
+    # Identify the 'source' nodes in the cluster-by-cluster network. A source node is defined as having no outgoing edges. Note:
+    # I got confused by graph theory terminology... in retrospect, I should have called these 'sink' instead of 'source' nodes.
+    # 
+    # -- Source nodes represent clusters of 'maximal' contig. A maximal contig is the largest version of that sequence in the
+    # input data, i.e. it is not contained within any larger contig.
     is_source = utils.as_flat((clusters_2_clusters > 0).sum(1)==1)
     sources = is_source.nonzero()[0]
 
+    # Create pd.Series of contigs' nucleotide lengths
     if lengths is None:
         assert fasta_dict is not None
         lengths = pd.Series({x : len(seq) for x, seq in fasta_dict.items()})
     lengths = pd.Series(lengths)
-        
-    # Calculate circularity
+    
+    ##################################
+    # Format circularity information #
+
     if circular_df is None:
         # Assume everything is circular
         circular_df = pd.Series(True, rownames)
-    # If the values are not already boolean, verify that the values are integer 0 or 1 (and then cast to boolean)
+    # If not already boolean, verify that values are integers 0 or 1, and then cast to boolean
     if not pd.api.types.is_bool_dtype(circular_df):
         assert all(x in [0,1] for x in circular_df.drop_duplicates().values), "Values for circularity were not boolean (True/False) or boolean integers (0/1)"
         circular_df = circular_df.astype(bool)
     # Create a boolean indicator vector for whether a contig is circular
-    tmp = circular_df.reindex(rownames).fillna(False).values.astype(np.int32)
-    # Number of member contigs that are circular
+    tmp = circular_df.loc[rownames].values.astype(np.int32)
+    # Calculate number of member contigs that are circular
     clusters_ncirc = utils.as_flat(contig_2_clusters_sp.T.dot(tmp.reshape(-1,1))).astype(np.int32)
 
-    ###############################################
-    # Get a dataframe describing each sub-cluster #
-    # (i.e. strongly connected components)        #
+    ###########################################
+    # Get a dataframe describing each cluster #
+    # (i.e. strongly connected components)    #
 
     # Calculate the reachability from every component other components
     clusters_2_clusters_paths = utils.reachability(clusters_2_clusters)
@@ -335,24 +353,35 @@ def derep_sources(similarities, similarity_threshold, min_alignment_fraction,
     for i, x in enumerate(meta_clusters):
         meta_clusters_assignments[x] = i
 
-    # Create dataframe describing clusters
-    clusters_df = pd.DataFrame({'meta_cluster' : meta_clusters_assignments,
-                                'sources_parents' : utils.as_flat((clusters_2_clusters[:,sources] > 0).sum(1)),
-                                'sources_ancestors' : utils.as_flat((clusters_2_clusters_paths[:, sources]).sum(1)),
-                                'is_source' : is_source,
-                                'members_circ' : clusters_ncirc,
-                                'sources_circ' : utils.as_flat((clusters_2_clusters_paths[:,sources[clusters_ncirc[sources] > 0]] > 0).sum(1)),
-                                'cluster_type' : ['source' if is_source else ('backbone' if (circ > 0) else 'fragment') for is_source, circ in zip(is_source, clusters_ncirc)],
-                                'members' : map(tuple, np.split(rownames[np.concatenate(list(comp))].values, np.cumsum([len(c2) for c2 in comp])[:-1])),
-                                'members_lengths' : map(tuple, np.split(lengths.loc[rownames[np.concatenate(list(comp))]].values, np.cumsum([len(c2) for c2 in comp])[:-1]))})
+    # Create `clusters_df`: a pd.DataFrame describing each cluster
+    clusters_df = pd.DataFrame({
+        'meta_cluster' : meta_clusters_assignments,
+        'sources_parents' : utils.as_flat((clusters_2_clusters[:,sources] > 0).sum(1)),
+        'sources_ancestors' : utils.as_flat((clusters_2_clusters_paths[:, sources]).sum(1)),
+
+        # Boolean indicator if this is a source cluster
+        'is_source' : is_source,
+        # Number of contigs in this cluster that are circular
+        'members_circ' : clusters_ncirc,
+
+        'sources_circ' : utils.as_flat((clusters_2_clusters_paths[:,sources[clusters_ncirc[sources] > 0]] > 0).sum(1)),
+
+        # Classifies every cluster as 'source', 'backbone', or 'fragment'
+        'cluster_type' : ['source' if is_source else ('backbone' if (circ > 0) else 'fragment') for is_source, circ in zip(is_source, clusters_ncirc)],
+
+        # Tuple of contigs in this cluster
+        'members' : map(tuple, np.split(rownames[np.concatenate(list(clusters))].values, np.cumsum([len(c2) for c2 in clusters])[:-1])),
+        # Tuple of lengths of contigs in this cluster
+        'members_lengths' : map(tuple, np.split(lengths.loc[rownames[np.concatenate(list(clusters))]].values, np.cumsum([len(c2) for c2 in clusters])[:-1]))
+    })
+    # Reduce tuple of contig lengths to a triple of statistics (min, median, max)
     clusters_df['members_lengths'] = [(min(x), median(x), max(x)) for x in clusters_df['members_lengths']]
     clusters_df['members_lengths_min'] = [x[0] for x in clusters_df['members_lengths']]
     clusters_df['members_lengths_max'] = [x[-1] for x in clusters_df['members_lengths']]
 
     # Annotate the min/median/max model score of plasmids in a cluster
     if plasmid_scores is not None:
-#        return plasmid_scores, rownames, comp
-        clusters_df['members_scores'] = list(map(tuple, np.split(plasmid_scores.loc[rownames[np.concatenate(list(comp))]].values, np.cumsum([len(c2) for c2 in comp])[:-1])))
+        clusters_df['members_scores'] = list(map(tuple, np.split(plasmid_scores.loc[rownames[np.concatenate(list(clusters))]].values, np.cumsum([len(c2) for c2 in clusters])[:-1])))
         clusters_df['members_scores'] = [(min(x), median(x), max(x)) for x in clusters_df['members_scores']]
         clusters_df['members_scores_min'] = [x[0] for x in clusters_df['members_scores']]
         clusters_df['members_scores_max'] = [x[-1] for x in clusters_df['members_scores']]
@@ -361,18 +390,18 @@ def derep_sources(similarities, similarity_threshold, min_alignment_fraction,
         print('Cluster types')
         utils.display(clusters_df['cluster_type'].value_counts())
 
-    # Create contigs_df
-    contigs_df = pd.Series({rownames[v] : i for i, v_list in enumerate(comp) for v in v_list}).to_frame('cluster')
+    # Create `contigs_df`: a pd.DataFrame describing each contig
+    contigs_df = pd.Series({rownames[v] : i for i, v_list in enumerate(clusters) for v in v_list}).to_frame('cluster')
     contigs_df['idx'] = np.arange(len(contigs_df))
     contigs_df = functools.reduce(lambda x, y: x.merge(y, left_index=True, right_index=True, how='outer'),
         [contigs_df,
          lengths.to_frame('length'),
-         comp_degrees.to_frame('nchildren_in_cluster'),
-         comp_sumANI.to_frame('avgANI'),
+         clusters_degrees.to_frame('nchildren_in_cluster'),
+         clusters_sumANI.to_frame('avgANI'),
          circular_df.reindex(rownames).to_frame('circular').fillna(False).rename_axis('contig')])
     contigs_df = contigs_df.rename_axis('contig').reset_index()
 
-    # Aggregate info about contigs within each cluster
+    # For each contig, add info about the cluster it is in
     clusters_df = functools.reduce(lambda x, y: x.merge(y, on='cluster', how='outer'),
                  [   # Cluster name
                      clusters_df.rename_axis('cluster').reset_index(),
@@ -393,7 +422,9 @@ def derep_sources(similarities, similarity_threshold, min_alignment_fraction,
     i, j = clusters_2_clusters_paths[backbone, :].nonzero()
     clusters_2_backbones = pd.DataFrame({'backbone' : backbone[i], 'cluster' : j})
     clusters_2_backbones = clusters_2_backbones.merge(clusters_df[['cluster', 'rep_central']].rename(columns={'rep_central' : 'backbone_rep_central'}), on='cluster')
-    clusters_2_backbones = clusters_2_backbones.groupby('cluster').agg(backbones=pd.NamedAgg('backbone', tuple), backbones_rep_central=pd.NamedAgg('backbone_rep_central', tuple))
+    clusters_2_backbones = clusters_2_backbones.groupby('cluster').agg(
+        backbones=pd.NamedAgg('backbone', tuple),
+        backbones_rep_central=pd.NamedAgg('backbone_rep_central', tuple))
     # Append dataframe of empty tuples for clusters with no backbones
     empty = pd.DataFrame(index=clusters_df.index.difference(clusters_2_backbones.index))
     for c in clusters_2_backbones.columns:
@@ -403,21 +434,28 @@ def derep_sources(similarities, similarity_threshold, min_alignment_fraction,
     # Merge this backbone info back into clusters_df
     clusters_df = clusters_df.merge(clusters_2_backbones, on='cluster')
 
+    # Create a new cluster type that has four categories:
+    # -- fragment and backbone stay the same.
+    # -- source clusters are renamed "compound", if it is part of a system (i.e. has a backbone),
+    # -- or "maximal_not_in_system" otherwise
+    clusters_df['cluster_four_types'] = [('maximal_not_in_system' if len(b)==0 else 'compound') if (c=='source') else c for c, b in clusters_df[['cluster_type', 'backbones']].to_records(index=False)]
+
     # Merge this aggregate info back into contigs_df
-    contigs_df = contigs_df.merge(clusters_df[['meta_cluster', 'cluster_size', 'cluster_type','rep_longest','rep_most_children','rep_central', 'rep_circular_central', 'backbones', 'backbones_rep_central']], left_on='cluster', right_index=True).set_index('contig')
+    contigs_df = contigs_df.merge(clusters_df[['meta_cluster', 'cluster_size', 'cluster_type', 'cluster_four_types', 'rep_longest','rep_most_children','rep_central', 'rep_circular_central', 'backbones', 'backbones_rep_central']],
+                                  left_on='cluster', right_index=True).set_index('contig')
 
     contigs_df = contigs_df.sort_values('idx')
 
     contigs_df['avgANI'] = contigs_df['avgANI'] / contigs_df['cluster_size']
 
 
-    #########################
-    ## Save data
+    #############
+    # Save data #
 
     if output is not None:
         # Save info about every contig
-        contigs_df.to_csv('{}.txt'.format(output), sep='\t', header=True, index=True)
-        utils.pickle(contigs_df, '{}.pkl.blp'.format(output))
+        contigs_df.to_csv('{}.contigs.txt'.format(output), sep='\t', header=True, index=True)
+        utils.pickle(contigs_df, '{}.contigs.pkl.blp'.format(output))
 
         # Save info about every cluster
         tmp = clusters_df.copy()
@@ -425,8 +463,8 @@ def derep_sources(similarities, similarity_threshold, min_alignment_fraction,
         tmp['members_lengths'] = tmp['members_lengths'].apply(lambda x: '|'.join(map(str,x)))
         if 'members_scores' in tmp.columns:
             tmp['members_scores'] = tmp['members_scores'].apply(lambda x: '|'.join(map(str,x)))
-        clusters_df.to_csv('{}.comp.txt'.format(output), sep='\t', header=True, index=True)
-        utils.pickle(clusters_df, '{}.comp.pkl.blp'.format(output))
+        clusters_df.to_csv('{}.clusters.txt'.format(output), sep='\t', header=True, index=True)
+        utils.pickle(clusters_df, '{}.clusters.pkl.blp'.format(output))
 
         # # Write fasta of representative contigs for all non-source and backbone clusters
         # assert fasta_dict is not None
@@ -445,7 +483,7 @@ def derep_sources(similarities, similarity_threshold, min_alignment_fraction,
         # Save cluster_2_clusters_paths
         utils.pickle(clusters_2_clusters_paths, '{}.clusters_2_clusters_paths.pkl.blp'.format(output))
 
-    return contigs_df, contig_2_clusters_sp, clusters_2_clusters, clusters_2_clusters_paths, sources, clusters_df
+    return contigs_df, contig_2_clusters_sp, clusters_2_clusters, clusters_2_clusters_paths, sources, clusters_df, similarities
 
 def view_ani_heatmap(similarities, values,
                      contigs=None, cmap=None, contig_2_clusters=None, cluster=True, center=None, figsize=None):
@@ -539,10 +577,10 @@ def parse_and_derep_fastANI(similarities, similarity_threshold, min_alignment_fr
     if os.path.exists(str(similarities)):
         similarities = read_fastANI(similarities, file_2_name=file_2_name, names=names)
 
-    similarities = threshold_fastANI(similarities, similarity_threshold, min_alignment_fraction,
-                                     calculate_coverage=calculate_coverage,
-                                     both_directions_alignment_fraction=both_directions_alignment_fraction,
-                                     do_remove_unused_categories=True)
+    similarities = threshold_ANI(similarities, similarity_threshold, min_alignment_fraction,
+                                 calculate_coverage=calculate_coverage,
+                                 both_directions_alignment_fraction=both_directions_alignment_fraction,
+                                 do_remove_unused_categories=True)
 
     comp, comp_reps = derep_fastANI(similarities, lengths=lengths, fasta_dict=fasta_dict)
 
@@ -605,9 +643,8 @@ def run_fastANI(fasta_df, output_dir, k=None, fragLen=None, minFraction=None, ma
 
 
 
-############################
-# MUMMER
-
+##########
+# MUMMER #
 
 def run_mummer(fasta, verbose=False, minmatch=None):
     """
@@ -623,7 +660,9 @@ def run_mummer(fasta, verbose=False, minmatch=None):
     
 #    with tempfile.NamedTemporaryFile('wt') as infile, tempfile.NamedTemporaryFile('wt') as outfile:
 #    with tempfile.NamedTemporaryFile('wt', delete=False) as infile, tempfile.NamedTemporaryFile('wt', delete=False) as outfile:
-    with tempfile.TemporaryDirectory() as d:
+
+#    with tempfile.TemporaryDirectory() as d:
+    with utils.TemporaryDirectory() as d:
         infile = os.path.join(d, 'in.fa')
         outfile = os.path.join(d, 'out')
         utils.write_fasta(fasta, infile)        
@@ -679,7 +718,6 @@ def mummer_fast_deltafilter(mummer_delta_file, outfile, n_jobs=None, delta_cmd=N
         header = '\n'.join(header) + '\n'
 
     if delta_cmd is None:
-        # delta_cmd = '/scratch/miniconda/envs/mummer/bin/delta-filter'
         delta_cmd = 'delta-filter'
 
     utils.tprint('Breaking up delta file and filtering')
@@ -721,7 +759,7 @@ def mummer_fast_deltafilter(mummer_delta_file, outfile, n_jobs=None, delta_cmd=N
     utils.tprint('Done')
 
 
-def read_mummer_aln_blocks(out_maxmatch, output=None, tmp=None, delete_tmp=None):
+def read_mummer_aln_blocks(maxmatch_file, output=None, tmp=None, delete_tmp=None, filename_prefix=None):
     """ Alternative way to parse .delta files from MUMMER
      - Strategy: De-interleave the '>' headers and alignment block info into two files.
      -           Read each file with pd.read_csv, then concatenate them together.
@@ -732,14 +770,13 @@ def read_mummer_aln_blocks(out_maxmatch, output=None, tmp=None, delete_tmp=None)
     """
 
     with utils.TemporaryDirectory(tmp, post_delete=delete_tmp) as tmp:
-    # try:
-    #     _, fname = tempfile.mkstemp(dir=tmp)
-    #     _, fname_headers = tempfile.mkstemp(dir=tmp)
-    #     _, fname_blocks = tempfile.mkstemp(dir=tmp)
 
-        fname = tmp / 'aln_core_info'
-        fname_headers = tmp / 'aln_core_info_headers'
-        fname_blocks = tmp / 'aln_core_info_blocks'
+        if filename_prefix is None:
+            filename_prefix = 'mummer_align.delta'
+
+        fname = tmp / f'{filename_prefix}_core'
+        fname_headers = tmp / f'{filename_prefix}_headers'
+        fname_blocks = tmp / f'{filename_prefix}_blocks'
 
         # Removes the trailing info for each alignment block. And adds line numbers. E.g. convert this:
         # 
@@ -761,36 +798,22 @@ def read_mummer_aln_blocks(out_maxmatch, output=None, tmp=None, delete_tmp=None)
         # 2  1 8458 23 8481 3 3 0
         # 3  >ITA0001_000000000070 ISR0091_000000003656 8475 8481
         # 4  1 8475 3 8481 5 5 0
-        utils.run_cmd("awk -F' ' '{if ((NF==7) || ($1 ~ /^>/)) print $0}' %s | nl > %s" % (out_maxmatch, fname), verbose=True)
+        utils.run_cmd("awk -F' ' '{if ((NF==7) || ($1 ~ /^>/)) print $0}' %s | nl > %s" % (maxmatch_file, fname), verbose=True)
 
         # Separate the alignment headers (starts with '>') and the alignment info into separate files,
         # in order to read them faster as homogenous dtype tables with pd.read_csv(). Finally, merge them back together.
         utils.run_cmd(f"grep '>' {fname} > {fname_headers}", verbose=True)
         utils.run_cmd(f"grep -v '>' {fname} > {fname_blocks}", verbose=True)
 
-        # subprocess.run("awk -F' ' '{if ((NF==7) || ($1 ~ /^>/)) print $0}' %s | nl > %s" % (out_maxmatch, fname), shell=True)
-        # subprocess.run("grep '>' {} > {}".format(fname, fname_headers), shell=True)
-        # subprocess.run("grep -v '>' {} > {}".format(fname, fname_blocks), shell=True)
-
-    #     time.sleep(3) # Wait to let files flush
         headers = pd.read_csv(fname_headers, delim_whitespace=True, header=None, names=['nl', 'ref','query','ref_len','query_len'])
         blocks = pd.read_csv(fname_blocks, delim_whitespace=True, header=None, names=['nl', 'ref_start', 'ref_end', 'query_start', 'query_end', 'errors', 'mismatches', 'nonalpha'])
         headers = headers.astype({'nl' : int})
         blocks = blocks.astype({'nl' : int})
-        # display(headers)
-        # display(blocks)
-        # display(pd.merge_asof(blocks, headers, on='nl', direction='backward'))
         aln_blocks = pd.merge_asof(blocks, headers, on='nl', direction='backward').drop(columns=['nl'])
 
         aln_blocks['ref'] = aln_blocks['ref'].str[1:]
         aln_blocks = aln_blocks.astype({'query':'category', 'ref':'category',
                                         **{k : np.int32 for k in ['query_start', 'query_end', 'ref_start', 'ref_end', 'errors', 'mismatches', 'nonalpha', 'query_len', 'ref_len']}})    
-
-    # finally:
-    #     if (delete_tmp is None) or delete_tmp:
-    #         os.remove(fname)
-    #         os.remove(fname_headers)
-    #         os.remove(fname_blocks)
 
     # print("awk -F' ' '{if ((NF==7) || ($1 ~ /^>/)) print $0}' out_maxmatch.delta > %s" % fname)
 
@@ -1024,19 +1047,22 @@ def depropagate_long(graph, row_header='row', col_header='col', value_header='we
 
     return graph
 
-def depropagate(X, X_paths):
+def depropagate(X, X_paths=None):
     """
-    De-transitivity-ize relations.
+    Get the transitive reduction of a directed graph.
     
-    X is a child-to-parent adjacency matrix
+    X is a child-to-parent adjacency matrix.
     
-    X_paths is a child-to-ancestor reachability matrix
+    X_paths is a child-to-ancestor reachability matrix.
     """
     
     X = X.copy()
     utils.setdiag(X, 0)
-    
-    X_paths = X_paths.copy()
+
+    if X_paths is None:
+        X_paths = utils.reachability(X)
+    else:
+        X_paths = X_paths.copy()
     utils.setdiag(X_paths, 0)
     
     # Paths of length 2
@@ -1046,18 +1072,19 @@ def depropagate(X, X_paths):
     X_deprop = scipy.sparse.csr_matrix(X_deprop)
     return X_deprop
 
-# clusters_2_clusters_deprop = depropagate(clusters_2_clusters, clusters_2_clusters_paths)
-
-def create_ani_network(cluster_list, clusters_2_clusters_paths, comp_df, 
-                       output=None,
-                       sample_2_clusters=None, 
-                       remove_fragment_plasmids=None,
-                       country_df=None,
-                       gene_2_clusters=None,
-                       vertex_attrs=None,
-                       edge_attrs=None,
-                       default_edge_attrs=None,
-                       extra_edges=None):
+def create_clusters_2_clusters_visualization(        
+        clusters_2_clusters_paths,
+        comp_df, 
+        cluster_list=None,
+        output=None,
+        sample_2_clusters=None, 
+        remove_fragment_plasmids=None,
+        country_df=None,
+        gene_2_clusters=None,
+        vertex_attrs=None,
+        edge_attrs=None,
+        default_edge_attrs=None,
+        extra_edges=None):
     """
     From a list of clusters, create the cluster-to-cluster subnetwork.
 
@@ -1080,16 +1107,12 @@ def create_ani_network(cluster_list, clusters_2_clusters_paths, comp_df,
     # ## Use the depropagated edges, for a more parsimonious network
     # clusters_2_clusters_norm = enrich.norm(clusters_2_clusters_deprop, marginals=comp_df['cluster_size'].values)
 
-    # subgraph = utils.reachability(clusters_2_clusters_norm)[cluster_list,:][:,cluster_list]
-    # subgraph_paths = subgraph
     subgraph = clusters_2_clusters_norm[cluster_list, :][:, cluster_list]
-    # subgraph_paths = utils.reachability(subgraph)
     subgraph_paths = subgraph > 0
-
-    # return cluster_list, subgraph_paths
 
     # Use the depropagated edges, for a more parsimonious network
     subgraph = depropagate(subgraph, subgraph_paths)
+
     # Remove self-edges
     utils.setdiag(subgraph, 0)
     print('Number of edges:', subgraph.nonzero()[0].size)
@@ -1151,25 +1174,16 @@ def create_ani_network(cluster_list, clusters_2_clusters_paths, comp_df,
             assert remove_fragment_plasmids
             assert country_df is not None
 
-            # # Set industrial and Mongolia samples to blue, and non-industrial samples to orange
-            # node_colors = node_colors.append(country_df.loc[sample_list, 'industrial'].map(
-            #     {'industrial' : '#1F77B4', 'nonindustrial' : '#FF7F0E', 'other' : '#1F77B4'}))
-            # node_colors = node_colors.to_frame('node_colors')
-
         else:
             raise Exception('Unsupported')
     
-    # display(node_colors)
-
     if extra_edges is not None:
         subgraph = pd.concat([subgraph, extra_edges], sort=True)
 
     subgraph = depropagate_long(subgraph)
 
     if gene_2_clusters is not None:
-#        subgraph = pd.concat([subgraph, gene_2_clusters.assign(weight=1).rename(columns={'cluster' : 'row', 'accession' : 'col'})])
         subgraph = pd.concat([subgraph, gene_2_clusters.assign(weight=1)])
-#        vertex_attrs = vertex_attrs.append(pd.Series('gene', gene_2_clusters['accession'].unique()).to_frame('node_type'))
 
     # Set all node sizes to 1
     vertex_attrs['node_size'] = 1
@@ -1181,38 +1195,13 @@ def create_ani_network(cluster_list, clusters_2_clusters_paths, comp_df,
         for c in pre_vertex_attrs.columns:
             if c not in vertex_attrs.columns:
                 vertex_attrs[c] = np.nan
-#            assert c in vertex_attrs.columns
         vertex_attrs.update(pre_vertex_attrs)
 
-    # Add edge attributes
-    # -- This needs to be a dataframe with columns named 'row' and 'col', to merge into the graph dataframe
-    if edge_attrs is not None:
-        subgraph = subgraph.merge(edge_attrs, on=['row','col'], how='left')
-
-    # Fill NA values in edge attributes with predefined default values
-    if default_edge_attrs is not None:
-        for c, v in default_edge_attrs.items():
-            subgraph[c] = subgraph[c].fillna(v)
-    for c in subgraph.columns:
-        if (c not in ['row', 'col']) and (subgraph[c].isna().sum()>0):
-            print(f"WARNING: edge attribute {c} has NA values and won't be written into graphml")
-
-#    return subgraph, vertex_attrs
-
-    G = utils.create_ig(subgraph, directed=True, vertex_attrs=vertex_attrs, v1='row', v2='col')
+    G = utils.create_ig(subgraph, directed=True, vertex_attrs=vertex_attrs, v1='row', v2='col',
+                        edge_attrs=edge_attrs,
+                        default_edge_attrs=default_edge_attrs,
+                        output=output)
     print(G.summary())
-
-    # G.es['test_edge_attr'] = 'hello'
-
-    if output is not None:
-        # - Check that `output` is a string or Path object
-        # - Convert to str (because sending a Path object to igraph.write_graphml will cause segmentation fault!!!)
-        import pathlib
-        assert isinstance(output, (str, pathlib.PosixPath))
-        output = str(output)
-
-        os.makedirs(os.path.dirname(output), exist_ok=True)
-        G.write_graphml(output)
 
     return G, vertex_attrs, subgraph
 
@@ -1311,23 +1300,39 @@ def separate_cargo_func(func,
 def format_derep_output(contigs_df, clusters_df, clusters_2_clusters, output=None):
     """Formats the output of derep_sources()"""
 
-    def rename_cluster_type(x):
-        if x=='source':
-            return 'maximal'
-        else:
-            return x
+    # def rename_cluster_type(x):
+    #     if x=='source':
+    #         return 'maximal'
+    #     else:
+    #         return x
 
-    def format_clusters(clusters_df):
-        tmp = clusters_df[['cluster', 'cluster_type', 'members', 'rep_central']].copy()
+    def format_clusters(clusters_df, systems_df):
+        tmp = clusters_df[['cluster', 'cluster_four_types', 'cluster_size', 'members_circ', 'members', 'rep_central', 'backbones']].copy()
         tmp = tmp.rename(columns={'rep_central' : 'representative_contig'})
         tmp['members'] = tmp['members'].apply(lambda x: '|'.join(sorted(x)))
-        tmp['cluster_type'] = tmp['cluster_type'].apply(rename_cluster_type)
+        tmp = tmp.rename(columns={'members':'contigs', 'cluster_size':'number_of_contigs', 'members_circ':'number_of_circular_contigs'})
+        # tmp['cluster_type'] = tmp['cluster_type'].apply(rename_cluster_type)
+        tmp = tmp.rename(columns={'cluster_four_types':'cluster_type'})
+
+        # Add system names
+        backbone_2_system = systems_df.set_index('backbone_cluster')['system_name'].to_dict()
+        tmp['backbones'] = tmp['backbones'].apply(lambda backbone_list: '|'.join([backbone_2_system[b] for b in sorted(backbone_list)]))
+        tmp = tmp.rename(columns={'backbones':'systems'})
+        
         return tmp
 
-    def format_contigs(contigs_df, clusters_df):    
-        tmp = contigs_df[['cluster', 'cluster_type', 'rep_central']].copy()
+    def format_contigs(contigs_df, clusters_df, systems_df):
+        tmp = contigs_df[['cluster', 'cluster_four_types', 'circular', 'rep_central', 'backbones']].copy()
         tmp = tmp.rename(columns={'rep_central' : 'representative_contig'})
-        tmp['cluster_type'] = tmp['cluster_type'].apply(rename_cluster_type)
+        # tmp['cluster_type'] = tmp['cluster_type'].apply(rename_cluster_type)
+        tmp = tmp.rename(columns={'cluster_four_types':'cluster_type'})
+        tmp['circular'] = tmp['circular'].astype(int)
+
+        # Add system names
+        backbone_2_system = systems_df.set_index('backbone_cluster')['system_name'].to_dict()
+        tmp['backbones'] = tmp['backbones'].apply(lambda backbone_list: '|'.join([backbone_2_system[b] for b in sorted(backbone_list)]))
+        tmp = tmp.rename(columns={'backbones':'systems'})
+
         return tmp
 
     def format_systems(contigs_df, clusters_df, clusters_2_clusters):
@@ -1336,16 +1341,23 @@ def format_derep_output(contigs_df, clusters_df, clusters_2_clusters, output=Non
         compound_tmp = nonfragments[nonfragments['cluster'] != nonfragments['backbone']]
         backbone_tmp = utils.subset(nonfragments, cluster_type='backbone')
 
+        # display(backbone_tmp)
+        # display(compound_tmp)
+
         backbone_2_compound_plasmid = compound_tmp.groupby('backbone')['contig'].apply(sorted).to_frame('compound_plasmids')
         backbone_2_compound_plasmid['number_of_compound_plasmids'] = backbone_2_compound_plasmid['compound_plasmids'].apply(len)
-        backbone_2_compound_plasmid['compound_plasmids'] = backbone_2_compound_plasmid['compound_plasmids'].apply(lambda x: '|'.join(x))
+#        backbone_2_compound_plasmid['compound_plasmids'] = backbone_2_compound_plasmid['compound_plasmids'].apply(lambda x: '|'.join(x))
 
         backbone_2_compound_cluster = compound_tmp.drop_duplicates(['backbone','cluster']).groupby('backbone')['cluster'].apply(sorted).to_frame('compound_clusters')
         backbone_2_compound_cluster['number_of_compound_clusters'] = backbone_2_compound_cluster['compound_clusters'].apply(len)
-        backbone_2_compound_cluster['compound_clusters'] = backbone_2_compound_cluster['compound_clusters'].apply(lambda x: '|'.join(map(str,x)))
+#        backbone_2_compound_cluster['compound_clusters'] = backbone_2_compound_cluster['compound_clusters'].apply(lambda x: '|'.join(map(str,x)))
 
         backbone_2_backbone_plasmid = backbone_tmp.groupby('cluster')['contig'].apply(sorted).to_frame('backbone_plasmids')
         backbone_2_backbone_plasmid['number_of_backbone_plasmids'] = backbone_2_backbone_plasmid['backbone_plasmids'].apply(len)
+#        backbone_2_backbone_plasmid['backbone_plasmids'] = backbone_2_backbone_plasmid['backbone_plasmids'].apply(lambda x: '|'.join(x))
+
+        backbone_2_compound_plasmid['compound_plasmids'] = backbone_2_compound_plasmid['compound_plasmids'].apply(lambda x: '|'.join(x))
+        backbone_2_compound_cluster['compound_clusters'] = backbone_2_compound_cluster['compound_clusters'].apply(lambda x: '|'.join(map(str,x)))
         backbone_2_backbone_plasmid['backbone_plasmids'] = backbone_2_backbone_plasmid['backbone_plasmids'].apply(lambda x: '|'.join(x))
 
         # Rename plasmid systems by using the argsort index order of the backbone's cluster numbers
@@ -1368,12 +1380,22 @@ def format_derep_output(contigs_df, clusters_df, clusters_2_clusters, output=Non
         return system_names
 
     systems_df = format_systems(contigs_df, clusters_df, clusters_2_clusters)
-    contigs_df = format_contigs(contigs_df, clusters_df)
+    clusters_df = format_clusters(clusters_df, systems_df)
+    contigs_df = format_contigs(contigs_df, clusters_df, systems_df)
     clusters_2_clusters = pd.DataFrame(clusters_2_clusters.nonzero(), index=['shorter_cluster', 'longer_cluster']).T
+
+    # display(contigs_df)
+    # display(clusters_df)
+    # display(systems_df)
+
+    assert systems_df['compound_plasmids'].notna().all(), "Some of your plasmid systems have no compound plasmids. This doesn't make sense and probably is a bug in the code"
     
     if output is not None:
         utils.write_table(contigs_df.reset_index(),
                           str(output) + '_contigs.txt',
+                          txt=True, txt_kws=dict(index=False))
+        utils.write_table(contigs_df.reset_index(),
+                          str(output) + '_clusters.txt',
                           txt=True, txt_kws=dict(index=False))
         utils.write_table(systems_df,
                           str(output) + '_systems.txt',
@@ -1382,4 +1404,53 @@ def format_derep_output(contigs_df, clusters_df, clusters_2_clusters, output=Non
                           str(output) + '_cluster_graph.txt',
                           txt=True, txt_kws=dict(index=False))
         
-    return contigs_df, systems_df, clusters_2_clusters
+    return contigs_df, clusters_df, systems_df, clusters_2_clusters
+
+
+def create_contig_2_contig_igraph(similarities, contigs_df, output=None):
+    """
+    similarities : long-format pd.DataFrame of ANI similarities between sequences. Only pairs that pass the similarity threshold (e.g. >=90% identity/coverage) should be included
+
+    contigs_df : pd.DataFrame describing the contigs
+    """
+    
+    tmp_contigs = contigs_df.copy()
+
+    # Create 'label' attribute for Cytoscape styling
+    tmp_contigs['label'] = [f"contig:{x}\ncluster:{y}\nsystem:{z}" \
+                            for x, y, z in contigs_df[['cluster','systems']].to_records(index=True)]
+
+    # # Add a dummy isolated node, for testing
+    # tmp_contigs = pd.concat([tmp_contigs, tmp_contigs.iloc[0].copy().rename('asdf').to_frame().T])
+
+    # Remove self-edges
+    tmp = similarities[similarities['query'] != similarities['reference']]
+
+    print('output:', output)
+
+    return utils.create_ig(tmp,
+                           v1='query', v2='reference',
+                           vertex_attrs=tmp_contigs,
+                           output=output)
+
+def create_cluster_2_cluster_igraph(clusters_2_clusters_sp, clusters_df, output=None):
+    """
+    clusters_2_clusters_sp : scipy.sparse adjacency matrix describing the child-to-parent edges
+
+    contigs_df : pd.DataFrame describing the clusters
+    """
+
+    tmp = depropagate(clusters_2_clusters_sp)
+
+    # Create 'label' attribute for Cytoscape styling
+    tmp_clusters = clusters_df.copy()
+    tmp_clusters['label'] = [f"cluster:{x}\nrep:{y}\nsystem:{z}" for x, y, z in clusters_df[['cluster', 'representative_contig','systems']].to_records(index=False)]
+    tmp_clusters.index = tmp_clusters.index.astype(str)
+
+    # # Add a dummy isolated node, for testing
+    # tmp_clusters = pd.concat([tmp_clusters, tmp_clusters.iloc[0].copy().rename('asdf').to_frame().T.assign(label='asdf')])
+
+    return utils.create_ig(tmp,
+                           vertex_attrs=tmp_clusters,
+                           rownames=[str(x) for x in range(tmp.shape[0])],
+                           output=output)
