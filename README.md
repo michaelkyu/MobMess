@@ -392,7 +392,8 @@ mobmess visualize -h
 usage: mobmess visualize [-h] -s SEQUENCES -a ANNOTATIONS [ANNOTATIONS ...]
                          [-g GENE_CALLS] -o OUTPUT [--contigs CONTIGS]
                          [--align ALIGN] [-T THREADS]
-                         [--neighborhood NEIGHBORHOOD]
+                         [--neighborhood NEIGHBORHOOD] [--width WIDTH]
+                         [--align-blocks-height ALIGN_BLOCKS_HEIGHT]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -429,6 +430,15 @@ optional arguments:
                         neighborhood upstream and downstream of each anchor.
                         Default: Show 20kb. Setting this to zero "0" will
                         visualize the entire contigs.
+  --width WIDTH         The width (inches) of the PDF page that shows the
+                        sequence alignment. You probably want to increase this
+                        value if your sequences are very long.
+  --align-blocks-height ALIGN_BLOCKS_HEIGHT
+                        The vertical spacing (inches) inbetween sequences.
+                        Increase this value to more clearly show the ribbons
+                        aligning sequences, especially for very long
+                        sequences. The default is 0.5. Set this to 1.0 to
+                        double the height, 2.0 to quadruple the height, etc.
 ```
 
 First, we will specify which plasmid contigs that we want to visualize together. We'll pick 11 representative plasmids from system PS1.
@@ -476,6 +486,8 @@ AST0151_000000002645	1725	2679	r	COG2367	COG_2014_FUNCTION	Beta-lactamase class 
 # Visualize the alignment of plasmids in a system
 # -- (Optional) You can generate the visualization slightly faster by using the alignment previously calculated by `mobmess systems` (from the above tutorial).
 #    To do this, include the parameter `--align $PREFIX-mobmess_ani_blocks.txt`. If you don't specify this parameter, alignments will be computed on the fly.
+# -- (Optional) Only ~40 kb subregions of each sequence are shown by default. Set the `--neighborhood` parameter to increase the size of the subregions. Setting `--neighborhood 0` will show the entire sequences.
+# -- (Optional) The parameters `--width` and `--align-blocks-height` control the page width and the vertical spacing between sequences. If your plasmids are very long (e.g. >50kb), consider increasing these parameters, e.g. `--width 200 --align-blocks-height 20`.
 mobmess visualize \
     --sequences $PREFIX.fa \
     --annotations $PREFIX-annotations.txt \
