@@ -379,6 +379,8 @@ If you can't see the directionality of edges (i.e. edges appear undirected), not
 
 # Tutorial for visualizing the sequence alignment and shared gene content of plasmids
 
+**You'll need to install extra dependencies. See the Installation section**
+
 We will visualize the backbone and cargo content of plasmid system PS1, which we inferred in the above tutorial steps (e.g. see contents of `test-contigs-mobmess_systems.txt`). 
 
 This system is the same as shown in Figure 5D (page 19) of our [biorxiv preprint](https://www.biorxiv.org/content/10.1101/2020.11.01.361691v2).
