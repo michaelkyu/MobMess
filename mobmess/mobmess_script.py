@@ -3,8 +3,7 @@ import textwrap
 
 import pandas as pd
 
-from plasx import utils
-from mobmess import ani_utils
+from mobmess import utils, ani_utils
 
 def infer_systems(args):
 
@@ -126,18 +125,21 @@ def visualize(args):
     # Need to set the matplotlib backend to a non-interactive one "Agg", otherwise it will try to create new windows of plots
     import matplotlib as mpl
     mpl.use('Agg')
-    
+
     plot.visualize_alignment(
         args.annotations,
+        gene_calls=args.gene_calls,
         contigs=contigs,
         fasta=args.sequences,
         aln_blocks=args.align,
         output=args.output,
         most_common_gene=True,
         dist='jacc',
-        width=40,
         neighborhood=args.neighborhood,
         show=False,
+        threads=args.threads,
+        width=args.width,
+        aln_blocks_height=args.align_blocks_height
         )
 
 def get_parser():   
@@ -199,6 +201,9 @@ def get_parser():
         '-a', '--annotations', dest='annotations', nargs='+', required=True,
         help='Table of gene annotations to COGs, Pfams, and de novo families')
     required.add_argument(
+        '-g', '--gene-calls', dest='gene_calls', default=None,
+        help='Table of gene calls, mapping gene_callers_id to contig')
+    required.add_argument(
         '-o', '--output', dest='output', required=True,
         help="""PDF file to save visualization.""")
     optional.add_argument(
@@ -210,8 +215,17 @@ def get_parser():
              """with the `--tmp` flag, then use the file 'mummer_align.qr_filter.pkl.blp'."""\
              """Default: if you don't specify this file, then MUMmer alignments will be computed on the fly.""")
     optional.add_argument(
+        '-T', '--threads', dest='threads', type=int, default=1,
+        help="""Number of threads to do pairwise MUMmer alignments (this only happens if you don't specify `--align`. Default: 1 thread""")
+    optional.add_argument(
         '--neighborhood', dest='neighborhood', type=int, default=20000,
         help="""Only a neighborhood around each anchor gene will be visualized. This specifies the size of the neighborhood upstream and downstream of each anchor. Default: Show 20kb. Setting this to zero "0" will visualize the entire contigs.""")
+    optional.add_argument(
+        '--width', dest='width', type=int, default=40,
+        help="""The width (inches) of the PDF page that shows the sequence alignment. You probably want to increase this value if your sequences are very long.""")
+    optional.add_argument(
+        '--align-blocks-height', dest='align_blocks_height', type=float, default=0.5,
+        help="""The vertical spacing (inches) inbetween sequences. Increase this value to more clearly show the ribbons aligning sequences, especially for very long sequences. The default is 0.5. Set this to 1.0 to double the height, 2.0 to quadruple the height, etc.""")
 
     return parser
 

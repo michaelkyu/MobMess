@@ -57,3 +57,93 @@ def setdiag(X, values):
     # Set diagonal
     X[i, i] = values
 
+
+def merge_gene_calls_and_functions(functions,
+                                   gene_calls,
+                                   contig_column=None,
+                                   annotation_column=None,
+                                   add_dummy_annotations=None,
+                                   verbose=None):
+    """
+    Merges two tables:
+    (1) A gene calls table that contains (contig,start,stop,direction) information about each gene. Each gene is given a unique integer id, called 'gene_callers_id'. This table is created by `anvi-export-gene-calls` in anvi'o.
+    (2) A gene functions table that contains a mapping of 'gene_callers_id' to an annotation. This table is created by `anvi-export-functions` in anvi'o
+
+    Merging is done on 'gene_callers_id'.
+
+    """
+    
+    
+    # Set default names of contig/annotation-columns
+    if contig_column is None:
+        contig_column = 'contig'
+
+    annotation_column_was_none = False
+    if annotation_column is None:
+        annotation_column_was_none = True
+        annotation_column = 'accession'
+
+    functions = utils.read_table(functions, verbose=verbose)
+
+    if gene_calls is not None:
+        gene_calls = utils.read_table(gene_calls, verbose=verbose)
+
+    def map_gene_callers_id_to_contig(functions):
+        """Maps gene_callers_id column to contig.
+
+        Example use case: a table from anvi-export-functions
+        contains only gene_callers_id. The mapping to contigs can
+        be found from anvi-export-gene-calls
+        """
+
+        if (gene_calls is not None) and (contig_column not in functions.columns):
+            assert 'gene_callers_id' in functions.columns, "Column 'contig' and 'gene_callers_id' were not in functions table."
+            assert 'gene_callers_id' in gene_calls.columns, "Column 'gene_callers_id' was not in gene calls table."
+
+            cols = [contig_column, 'gene_callers_id']
+            for c in ['start','stop','direction']:
+                if c in gene_calls.columns:
+                    cols.append(c)
+
+            if verbose:
+                print('Attempting merge of gene calls and functions')
+
+            if add_dummy_annotations:
+                functions = functions.merge(gene_calls[cols], on=['gene_callers_id'], how='outer')
+#                display(functions)
+
+                assert 'source' in functions.columns
+                functions['source'] = functions['source'].fillna('dummy_annotation')
+
+                if 'descriptions' in functions.columns:
+                    description_col = 'descriptions'
+                elif 'function' in functions.columns:
+                    description_col = 'function'
+                else:
+                    description_col = None
+                    
+                if description_col is not None:
+                    functions['description'] = [f'{c}_{start}_{stop}_{direction}' if pd.isna(description) else description \
+                                                for c, start, stop, direction, description in functions[['contig', 'start', 'stop', 'direction', description_col]].to_records(index=False)]
+#                display(functions)
+
+            else:
+                functions = functions.merge(gene_calls[cols], on=['gene_callers_id'])
+        else:
+            print('Skipping merge of gene calls and functions')
+
+        return functions
+
+    try:
+        C = utils.read_table(functions,
+                             verbose=verbose,
+                             post_apply=map_gene_callers_id_to_contig)
+    except KeyError:
+        if annotation_column_was_none:
+            annotation_column = 'annotation'
+
+        C = utils.read_table(functions,
+                             verbose=verbose,
+                             post_apply=map_gene_callers_id_to_contig)
+    
+    return C

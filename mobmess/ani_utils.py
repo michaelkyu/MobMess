@@ -646,7 +646,7 @@ def run_fastANI(fasta_df, output_dir, k=None, fragLen=None, minFraction=None, ma
 ##########
 # MUMMER #
 
-def run_mummer(fasta, verbose=False, minmatch=None):
+def run_mummer(fasta, verbose=False, minmatch=None, threads=None):
     """
     Runs MUMMER. This is so far only used for genome view.
 
@@ -657,14 +657,18 @@ def run_mummer(fasta, verbose=False, minmatch=None):
 
     if minmatch is None:
         minmatch = 16
+    minmatch = int(minmatch)
     
+    if threads is None:
+        threads = utils.get_max_threads()
+    threads = int(threads)
+
     with utils.TemporaryDirectory() as d:
         infile = os.path.join(d, 'in.fa')
         outfile = os.path.join(d, 'out')
         utils.write_fasta(fasta, infile)        
 
-        utils.run_cmd("""nucmer --maxmatch --minmatch={minmatch} -p {outfile} -t 252 {infile} {infile}""".format(
-            infile=infile, outfile=outfile, minmatch=int(minmatch)),
+        utils.run_cmd(f"nucmer --maxmatch --minmatch={minmatch} -p {outfile} -t {threads} {infile} {infile}",
                       debug=False, verbose=verbose)
         aln_blocks = read_mummer_aln_blocks(outfile + '.delta')
 

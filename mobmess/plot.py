@@ -1456,6 +1456,7 @@ def examine_gene_pair(functions, a, b, descriptions, w, slop, contigs, **kwargs)
 def visualize_alignment(
         functions,
         genes=None,
+        gene_calls=None,
         w=None,
         neighborhood=None,
         contigs=None,
@@ -1473,6 +1474,7 @@ def visualize_alignment(
         dist=None,
         aln_blocks=None,
         aln_blocks_is_1_based=None,
+        aln_blocks_height=None,
         representatives=None,
         max_loci=None,
         assignments=None,
@@ -1492,6 +1494,7 @@ def visualize_alignment(
         anchor_direction='f',
         renumber_accessions=True,
         write_loci=None,
+        threads=None,
         **kwargs):
     """
     Visualize alignment and shared gene content of multiple contigs
@@ -1526,7 +1529,9 @@ def visualize_alignment(
     ###########################################
     
     # Read gene functions table
-    functions = utils.read_table(functions)
+    functions = utils.merge_gene_calls_and_functions(functions, gene_calls, verbose=True)
+#    functions = utils.merge_gene_calls_and_functions(functions, gene_calls, add_dummy_annotations=True, verbose=True)
+    print('functions columns:', list(functions.columns))
     if any(c not in functions.columns for c in ['contig', 'start', 'stop', 'direction', 'accession', 'source']):
         raise Exception("The columns 'contig', 'start', 'stop', 'direction', 'accession', 'source' need to be in your function annotations table")
     dtype_mapping = {'contig':'category', 'accession':'category', 'source':'category', 'direction':'category', 'description':'category', 'function':'category'}
@@ -1655,6 +1660,8 @@ def visualize_alignment(
         utils.tprint(f'Adding {len(new_anchor_genes)} anchors genes:', verbose=verbose)
         genes = list(genes) + new_anchor_genes
 
+    print('Anchor gene families:', list(genes))
+
     # Get subset of annotations that contain the anchor genes
     if len(genes)==0:
         pass
@@ -1706,13 +1713,17 @@ def visualize_alignment(
         genes_encompassing = utils.subset(functions, contig=contigs_encompassing).reset_index(drop=True)
         if verbose: print('Total loci:', instances.shape[0])
 
-        if neighborhood is None:
+        if (neighborhood is None) or (neighborhood<=0):
             # Set default neighborhood to be very high (10 Mb)
             neighborhood = int(1e7)
+        print('neighborhood:', neighborhood)
 
-        # Slop and then merge overlapping loci (might have been created by slopping)
+#        return instances, neighborhood, contig_lengths
+
+        # slop and then merge overlapping loci (might have been created by slopping)
         loci = slop(instances, neighborhood, sizes=contig_lengths)
         loci = interval_merge_self(loci)
+
         if verbose: print('Loci after merging:', loci.shape[0])
 
     utils.tprint(f'Contigs to be plotted: {contigs_encompassing.size}', verbose=verbose)
@@ -2038,7 +2049,7 @@ def visualize_alignment(
         if aln_blocks is not None:
             # Rotate fasta and recompute MUMMER alignments
             fasta = utils.transform_sequences(utils.subset_dict(fasta, loci['contig'].unique()), rotate_deltas)
-            aln_blocks = utils.run_mummer(fasta, verbose=False, minmatch=11)
+            aln_blocks = utils.run_mummer(fasta, verbose=True, minmatch=11, threads=threads)
 
     ######################################
     # Recenter contigs around the anchor #
@@ -2126,12 +2137,12 @@ def visualize_alignment(
     height = 0.25
 #    height = 1
 
-    if aln_blocks is None:
-        hspace = 0.5
-    else:
-#        hspace = 0.75
-        hspace = 1
-#    height += hspace
+    hspace = 0.5
+    if aln_blocks is not None:
+        if aln_blocks_height is None:
+            aln_blocks_height = 0.5
+
+        hspace += aln_blocks_height
 
     plot_cov = cov_dict is not None
     if plot_cov:
@@ -2319,7 +2330,8 @@ def visualize_alignment(
         from matplotlib.backends.backend_pdf import PdfPages
         with PdfPages('{}_genome_plot.pdf'.format(output)) as pdf:
             pdf.savefig(fig_dist)
-            pdf.savefig(fig_heatmap.fig)
+            if fig_heatmap is not None:
+                pdf.savefig(fig_heatmap.fig)
             pdf.savefig(fig)
 
         # # Only save alignment
@@ -2399,7 +2411,8 @@ def visualize_alignment(
     if not show:
         plt.close(fig)
         plt.close(fig_dist)
-        plt.close(fig_heatmap.fig)
+        if fig_heatmap is not None:
+            plt.close(fig_heatmap.fig)
 
     return instances, loci, loci_genes, loci_genes_pivot, loci_genes_merged, fig, fig_dist, fig_heatmap
 
@@ -2622,6 +2635,10 @@ def slop(functions, slop, sizes=None):
     """
 
     functions = functions.copy()
+
+    # display(functions.dtypes)
+    # display(functions)
+
     functions['start'] = functions['start'] - slop
     functions['stop'] = functions['stop'] + slop
 
@@ -2635,6 +2652,8 @@ def slop(functions, slop, sizes=None):
         functions.drop(columns=['size'], inplace=True)
 
     functions['start'] = np.maximum(0, functions['start'])
+
+    # display(functions)
 
     return functions
 
