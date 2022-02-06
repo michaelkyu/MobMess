@@ -487,7 +487,7 @@ AST0151_000000002645	1725	2679	r	COG2367	COG_2014_FUNCTION	Beta-lactamase class 
 # -- (Optional) You can generate the visualization slightly faster by using the alignment previously calculated by `mobmess systems` (from the above tutorial).
 #    To do this, include the parameter `--align $PREFIX-mobmess_ani_blocks.txt`. If you don't specify this parameter, alignments will be computed on the fly.
 # -- (Optional) Only ~40 kb subregions of each sequence are shown by default. Set the `--neighborhood` parameter to increase the size of the subregions. Setting `--neighborhood 0` will show the entire sequences.
-# -- (Optional) The parameters `--width` and `--align-blocks-height` control the page width and the vertical spacing between sequences. If your plasmids are very long (e.g. >50kb), consider increasing these parameters, e.g. `--width 200 --align-blocks-height 20`.
+# -- (Optional) The parameters `--width` and `--align-blocks-height` control the page width and the vertical spacing between sequences. If your plasmids are very long (e.g. >50kb), consider increasing these parameters, e.g. `--width 200 --align-blocks-height 2`.
 mobmess visualize \
     --sequences $PREFIX.fa \
     --annotations $PREFIX-annotations.txt \
