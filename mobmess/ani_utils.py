@@ -1335,21 +1335,16 @@ def format_derep_output(contigs_df, clusters_df, clusters_2_clusters, output=Non
         compound_tmp = nonfragments[nonfragments['cluster'] != nonfragments['backbone']]
         backbone_tmp = utils.subset(nonfragments, cluster_type='backbone')
 
-        # display(backbone_tmp)
-        # display(compound_tmp)
-
-        backbone_2_compound_plasmid = compound_tmp.groupby('backbone')['contig'].apply(sorted).to_frame('compound_plasmids')
+        backbone_2_compound_plasmid = compound_tmp.drop_duplicates(['backbone','contig']).groupby('backbone')['contig'].apply(sorted).to_frame('compound_plasmids')
         backbone_2_compound_plasmid['number_of_compound_plasmids'] = backbone_2_compound_plasmid['compound_plasmids'].apply(len)
-#        backbone_2_compound_plasmid['compound_plasmids'] = backbone_2_compound_plasmid['compound_plasmids'].apply(lambda x: '|'.join(x))
 
         backbone_2_compound_cluster = compound_tmp.drop_duplicates(['backbone','cluster']).groupby('backbone')['cluster'].apply(sorted).to_frame('compound_clusters')
         backbone_2_compound_cluster['number_of_compound_clusters'] = backbone_2_compound_cluster['compound_clusters'].apply(len)
-#        backbone_2_compound_cluster['compound_clusters'] = backbone_2_compound_cluster['compound_clusters'].apply(lambda x: '|'.join(map(str,x)))
 
-        backbone_2_backbone_plasmid = backbone_tmp.groupby('cluster')['contig'].apply(sorted).to_frame('backbone_plasmids')
+        backbone_2_backbone_plasmid = backbone_tmp.drop_duplicates(['cluster','contig']).groupby('cluster')['contig'].apply(sorted).to_frame('backbone_plasmids')
         backbone_2_backbone_plasmid['number_of_backbone_plasmids'] = backbone_2_backbone_plasmid['backbone_plasmids'].apply(len)
-#        backbone_2_backbone_plasmid['backbone_plasmids'] = backbone_2_backbone_plasmid['backbone_plasmids'].apply(lambda x: '|'.join(x))
 
+        # Convert tuple to a single string concatenated by '|'
         backbone_2_compound_plasmid['compound_plasmids'] = backbone_2_compound_plasmid['compound_plasmids'].apply(lambda x: '|'.join(x))
         backbone_2_compound_cluster['compound_clusters'] = backbone_2_compound_cluster['compound_clusters'].apply(lambda x: '|'.join(map(str,x)))
         backbone_2_backbone_plasmid['backbone_plasmids'] = backbone_2_backbone_plasmid['backbone_plasmids'].apply(lambda x: '|'.join(x))
