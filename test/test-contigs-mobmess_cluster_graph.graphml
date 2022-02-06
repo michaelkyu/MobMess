@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
+         http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+<!-- Created by igraph -->
+  <key id="v_cluster" for="node" attr.name="cluster" attr.type="double"/>
+  <key id="v_cluster_type" for="node" attr.name="cluster_type" attr.type="string"/>
+  <key id="v_number_of_contigs" for="node" attr.name="number_of_contigs" attr.type="double"/>
+  <key id="v_number_of_circular_contigs" for="node" attr.name="number_of_circular_contigs" attr.type="double"/>
+  <key id="v_contigs" for="node" attr.name="contigs" attr.type="string"/>
+  <key id="v_representative_contig" for="node" attr.name="representative_contig" attr.type="string"/>
+  <key id="v_systems" for="node" attr.name="systems" attr.type="string"/>
+  <key id="v_label" for="node" attr.name="label" attr.type="string"/>
+  <key id="v_name" for="node" attr.name="name" attr.type="string"/>
+  <key id="e_row" for="edge" attr.name="row" attr.type="double"/>
+  <key id="e_col" for="edge" attr.name="col" attr.type="double"/>
+  <key id="e_weight" for="edge" attr.name="weight" attr.type="double"/>
+  <graph id="G" edgedefault="directed">
+    <node id="n0">
+      <data key="v_cluster">0</data>
+      <data key="v_cluster_type">backbone</data>
+      <data key="v_number_of_contigs">1</data>
+      <data key="v_number_of_circular_contigs">1</data>
+      <data key="v_contigs">MON0062_000000008770</data>
+      <data key="v_representative_contig">MON0062_000000008770</data>
+      <data key="v_systems">PS1</data>
+      <data key="v_label">cluster:0
+rep:MON0062_000000008770
+system:PS1</data>
+      <data key="v_name">0</data>
+    </node>
+    <node id="n1">
+      <data key="v_cluster">1</data>
+      <data key="v_cluster_type">backbone</data>
+      <data key="v_number_of_contigs">73</data>
+      <data key="v_number_of_circular_contigs">16</data>
+      <data key="v_contigs">AST0016_000000004532|CAN0004_000000004460|CAN0005_000000003481|CAN0015_000000007026|CHI0033_000000001004|CHI0132_000000005259|DEN0022_000000006299|DEN0056_000000000137|DEN0078_000000004762|ENG0159_000000004018|FIJ0137_000000001400|ISR0004_000000002872|ISR0006_000000003264|ISR0011_000000004494|ISR0039_000000005434|ISR0042_000000004375|ISR0061_000000000640|ISR0068_000000003385|ISR0088_000000003883|ISR0098_000000003141|ISR0120_000000004780|ISR0126_000000007664|ISR0135_000000003479|ISR0138_000000005192|ISR0167_000000005611|ISR0183_000000005642|ISR0212_000000005743|ISR0213_000000003941|ISR0216_000000003631|ISR0234_000000001806|ISR0267_000000002758|ISR0296_000000003589|ISR0303_000000002024|ISR0324_000000005217|ISR0332_000000002114|ISR0343_000000002447|ISR0389_000000003237|ISR0778_000000002214|ISR0779_000000005823|ISR0783_000000002556|ISR0800_000000001957|ISR0812_000000006764|ISR0836_000000003566|MON0010_000000002500|MON0014_000000002911|MON0031_000000004754|MON0033_000000010548|MON0040_000000002620|MON0045_000000003316|MON0046_000000004533|MON0047_000000003642|MON0063_000000003551|MON0065_000000004125|MON0066_000000002479|MON0067_000000001519|MON0068_000000004711|MON0071_000000001541|MON0076_000000006085|MON0083_000000002520|MON0086_000000003808|MON0088_000000004946|MON0093_000000005538|MON0095_000000003471|MON0099_000000006557|MON0101_000000007991|MON0102_000000006537|MON0103_000000008652|MON0104_000000004488|MON0105_000000006867|MON0108_000000002328|SPA0041_000000006110|USA0025_01_000000002694|USA0042_01_000000003378</data>
+      <data key="v_representative_contig">ISR0183_000000005642</data>
+      <data key="v_systems">PS1|PS2</data>
+      <data key="v_label">cluster:1
+rep:ISR0183_000000005642
+system:PS1|PS2</data>
+      <data key="v_name">1</data>
+    </node>
+    <node id="n2">
+      <data key="v_cluster">2</data>
+      <data key="v_cluster_type">compound</data>
+      <data key="v_number_of_contigs">1</data>
+      <data key="v_number_of_circular_contigs">1</data>
+      <data key="v_contigs">ISR0266_000000001592</data>
+      <data key="v_representative_contig">ISR0266_000000001592</data>
+      <data key="v_systems">PS1|PS2</data>
+      <data key="v_label">cluster:2
+rep:ISR0266_000000001592
+system:PS1|PS2</data>
+      <data key="v_name">2</data>
+    </node>
+    <node id="n3">
+      <data key="v_cluster">3</data>
+      <data key="v_cluster_type">compound</data>
+      <data key="v_number_of_contigs">3</data>
+      <data key="v_number_of_circular_contigs">1</data>
+      <data key="v_contigs">CHI0011_000000000792|CHI0047_000000002374|CHI0182_000000003822</data>
+      <data key="v_representative_contig">CHI0011_000000000792</data>
+      <data key="v_systems">PS1|PS2</data>
+      <data key="v_label">cluster:3
+rep:CHI0011_000000000792
+system:PS1|PS2</data>
+      <data key="v_name">3</data>
+    </node>
+    <node id="n4">
+      <data key="v_cluster">4</data>
+      <data key="v_cluster_type">backbone</data>
+      <data key="v_number_of_contigs">2</data>
+      <data key="v_number_of_circular_contigs">1</data>
+      <data key="v_contigs">ISR0388_000000004420|ISR0775_000000002602</data>
+      <data key="v_representative_contig">ISR0388_000000004420</data>
+      <data key="v_systems">PS1|PS2|PS3</data>
+      <data key="v_label">cluster:4
+rep:ISR0388_000000004420
+system:PS1|PS2|PS3</data>
+      <data key="v_name">4</data>
+    </node>
+    <node id="n5">
+      <data key="v_cluster">5</data>
+      <data key="v_cluster_type">compound</data>
+      <data key="v_number_of_contigs">2</data>
+      <data key="v_number_of_circular_contigs">2</data>
+      <data key="v_contigs">ENG0179_000000005290|SPA0017_000000002012</data>
+      <data key="v_representative_contig">ENG0179_000000005290</data>
+      <data key="v_systems">PS1|PS2</data>
+      <data key="v_label">cluster:5
+rep:ENG0179_000000005290
+system:PS1|PS2</data>
+      <data key="v_name">5</data>
+    </node>
+    <node id="n6">
+      <data key="v_cluster">6</data>
+      <data key="v_cluster_type">compound</data>
+      <data key="v_number_of_contigs">9</data>
+      <data key="v_number_of_circular_contigs">6</data>
+      <data key="v_contigs">CHI0104_000000000651|CHI0158_000000001726|ETH0001_000000002368|ISR0159_000000003045|ISR0166_000000001731|ISR0179_000000003111|ISR0254_000000000672|ISR0373_000000001514|ISR0785_000000003080</data>
+      <data key="v_representative_contig">ISR0179_000000003111</data>
+      <data key="v_systems">PS1|PS2|PS3</data>
+      <data key="v_label">cluster:6
+rep:ISR0179_000000003111
+system:PS1|PS2|PS3</data>
+      <data key="v_name">6</data>
+    </node>
+    <node id="n7">
+      <data key="v_cluster">7</data>
+      <data key="v_cluster_type">compound</data>
+      <data key="v_number_of_contigs">2</data>
+      <data key="v_number_of_circular_contigs">2</data>
+      <data key="v_contigs">ISR0036_000000000921|SPA0125_000000004168</data>
+      <data key="v_representative_contig">ISR0036_000000000921</data>
+      <data key="v_systems">PS1|PS2</data>
+      <data key="v_label">cluster:7
+rep:ISR0036_000000000921
+system:PS1|PS2</data>
+      <data key="v_name">7</data>
+    </node>
+    <node id="n8">
+      <data key="v_cluster">8</data>
+      <data key="v_cluster_type">compound</data>
+      <data key="v_number_of_contigs">9</data>
+      <data key="v_number_of_circular_contigs">9</data>
+      <data key="v_contigs">ISR0018_000000002548|ISR0052_000000003117|ISR0091_000000003656|ISR0117_000000003149|ISR0141_000000004143|ISR0284_000000000765|ISR0823_000000000608|ISR0835_000000001116|ITA0001_000000000070</data>
+      <data key="v_representative_contig">ISR0117_000000003149</data>
+      <data key="v_systems">PS1|PS2</data>
+      <data key="v_label">cluster:8
+rep:ISR0117_000000003149
+system:PS1|PS2</data>
+      <data key="v_name">8</data>
+    </node>
+    <node id="n9">
+      <data key="v_cluster">9</data>
+      <data key="v_cluster_type">backbone</data>
+      <data key="v_number_of_contigs">20</data>
+      <data key="v_number_of_circular_contigs">19</data>
+      <data key="v_contigs">AST0151_000000002645|CHI0062_000000002655|CHI0156_000000001900|CHI0164_000000003632|CHI0169_000000002212|ENG0016_000000003588|ENG0030_000000003504|ENG0095_000000004164|ENG0146_000000003895|ENG0157_000000003695|ENG0169_000000003280|ISR0092_000000003001|ISR0134_000000005429|ISR0243_000000001341|ISR0374_000000002617|ISR0852_000000001136|SPA0029_000000003617|SPA0101_000000007042|SPA0136_000000005685|USA0020_01_000000005465</data>
+      <data key="v_representative_contig">CHI0169_000000002212</data>
+      <data key="v_systems">PS1|PS2|PS4</data>
+      <data key="v_label">cluster:9
+rep:CHI0169_000000002212
+system:PS1|PS2|PS4</data>
+      <data key="v_name">9</data>
+    </node>
+    <node id="n10">
+      <data key="v_cluster">10</data>
+      <data key="v_cluster_type">compound</data>
+      <data key="v_number_of_contigs">1</data>
+      <data key="v_number_of_circular_contigs">1</data>
+      <data key="v_contigs">USA0022_01_000000001239</data>
+      <data key="v_representative_contig">USA0022_01_000000001239</data>
+      <data key="v_systems">PS1|PS2|PS4</data>
+      <data key="v_label">cluster:10
+rep:USA0022_01_000000001239
+system:PS1|PS2|PS4</data>
+      <data key="v_name">10</data>
+    </node>
+    <edge source="n0" target="n1">
+      <data key="e_row">0</data>
+      <data key="e_col">1</data>
+      <data key="e_weight">11</data>
+    </edge>
+    <edge source="n1" target="n2">
+      <data key="e_row">1</data>
+      <data key="e_col">2</data>
+      <data key="e_weight">15</data>
+    </edge>
+    <edge source="n1" target="n3">
+      <data key="e_row">1</data>
+      <data key="e_col">3</data>
+      <data key="e_weight">6</data>
+    </edge>
+    <edge source="n1" target="n4">
+      <data key="e_row">1</data>
+      <data key="e_col">4</data>
+      <data key="e_weight">6</data>
+    </edge>
+    <edge source="n1" target="n5">
+      <data key="e_row">1</data>
+      <data key="e_col">5</data>
+      <data key="e_weight">7</data>
+    </edge>
+    <edge source="n1" target="n7">
+      <data key="e_row">1</data>
+      <data key="e_col">7</data>
+      <data key="e_weight">68</data>
+    </edge>
+    <edge source="n1" target="n8">
+      <data key="e_row">1</data>
+      <data key="e_col">8</data>
+      <data key="e_weight">324</data>
+    </edge>
+    <edge source="n1" target="n9">
+      <data key="e_row">1</data>
+      <data key="e_col">9</data>
+      <data key="e_weight">22</data>
+    </edge>
+    <edge source="n4" target="n6">
+      <data key="e_row">4</data>
+      <data key="e_col">6</data>
+      <data key="e_weight">18</data>
+    </edge>
+    <edge source="n9" target="n10">
+      <data key="e_row">9</data>
+      <data key="e_col">10</data>
+      <data key="e_weight">20</data>
+    </edge>
+  </graph>
+</graphml>
