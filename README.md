@@ -389,8 +389,9 @@ mobmess visualize -h
 ```
 
 ```
-usage: mobmess visualize [-h] -s SEQUENCES -a ANNOTATIONS [ANNOTATIONS ...] -o
-                         OUTPUT [--contigs CONTIGS] [--align ALIGN]
+usage: mobmess visualize [-h] -s SEQUENCES -a ANNOTATIONS [ANNOTATIONS ...]
+                         [-g GENE_CALLS] -o OUTPUT [--contigs CONTIGS]
+                         [--align ALIGN] [-T THREADS]
                          [--neighborhood NEIGHBORHOOD]
 
 optional arguments:
@@ -402,6 +403,8 @@ required arguments:
   -a ANNOTATIONS [ANNOTATIONS ...], --annotations ANNOTATIONS [ANNOTATIONS ...]
                         Table of gene annotations to COGs, Pfams, and de novo
                         families
+  -g GENE_CALLS, --gene-calls GENE_CALLS
+                        Table of gene calls, mapping gene_callers_id to contig
   -o OUTPUT, --output OUTPUT
                         PDF file to save visualization.
 
@@ -416,6 +419,10 @@ optional arguments:
                         'mummer_align.qr_filter.pkl.blp'.Default: if you don't
                         specify this file, then MUMmer alignments will be
                         computed on the fly.
+  -T THREADS, --threads THREADS
+                        Number of threads to do pairwise MUMmer alignments
+                        (this only happens if you don't specify `--align`.
+                        Default: 1 thread
   --neighborhood NEIGHBORHOOD
                         Only a neighborhood around each anchor gene will be
                         visualized. This specifies the size of the
@@ -473,6 +480,7 @@ mobmess visualize \
     --sequences $PREFIX.fa \
     --annotations $PREFIX-annotations.txt \
     --contigs $contigs \
+    --threads $THREADS \
     --output Figure-5D-genome-visualization.pdf 
 ```
 
