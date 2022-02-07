@@ -199,10 +199,13 @@ def get_parser():
         help="""Fasta file of the sequences to align and cluster""")
     required.add_argument(
         '-a', '--annotations', dest='annotations', nargs='+', required=True,
-        help='Table of gene annotations to COGs, Pfams, and de novo families')
+        help="Table of gene annotations. This can be one of two formats. "\
+             "(Format A) Contain the columns 'contig', 'start', 'stop', 'direction', 'accession', and 'source'. This table can (optionally) also have a column named 'description' or, equivalently, 'function'. "\
+             "(Format B) Contain the columns 'gene_callers_id', 'accession', and 'source'. This kind of table is created by `anvi-export-functions` on an anvi'o database. "\
+             "If you use this format, you must supply a gene calls table (see `--gene-calls`) to map information about 'gene_callers_id'.")
     required.add_argument(
         '-g', '--gene-calls', dest='gene_calls', default=None,
-        help='Table of gene calls, mapping gene_callers_id to contig')
+        help="Table of gene calls. This table contains a column 'gene_callers_id' together with the following columns to describe a gene: 'contig', 'start', 'stop', 'direction'. This table can be created using `anvi-export-gene-calls` on an anvio'o database.")
     required.add_argument(
         '-o', '--output', dest='output', required=True,
         help="""PDF file to save visualization.""")
