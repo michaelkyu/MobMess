@@ -404,10 +404,23 @@ required arguments:
   -s SEQUENCES, --sequences SEQUENCES
                         Fasta file of the sequences to align and cluster
   -a ANNOTATIONS [ANNOTATIONS ...], --annotations ANNOTATIONS [ANNOTATIONS ...]
-                        Table of gene annotations to COGs, Pfams, and de novo
-                        families
+                        Table of gene annotations. This can be one of two
+                        formats. (Format A) Contain the columns 'contig',
+                        'start', 'stop', 'direction', 'accession', and
+                        'source'. This table can (optionally) also have a
+                        column named 'description' or, equivalently,
+                        'function'. (Format B) Contain the columns
+                        'gene_callers_id', 'accession', and 'source'. This
+                        kind of table is created by `anvi-export-functions` on
+                        an anvi'o database. If you use this format, you must
+                        supply a gene calls table (see `--gene-calls`) to map
+                        information about 'gene_callers_id'.
   -g GENE_CALLS, --gene-calls GENE_CALLS
-                        Table of gene calls, mapping gene_callers_id to contig
+                        Table of gene calls. This table contains a column
+                        'gene_callers_id' together with the following columns
+                        to describe a gene: 'contig', 'start', 'stop',
+                        'direction'. This table can be created using `anvi-
+                        export-gene-calls` on an anvio'o database.
   -o OUTPUT, --output OUTPUT
                         PDF file to save visualization.
 
@@ -452,8 +465,8 @@ contigs=CHI0047_000000002374,CHI0169_000000002212,ENG0179_000000005290,FIJ0137_0
 
 Next, we'll need a table of gene annotations. 
 
-* The table needs the columns 'contig', 'start', 'stop', 'direction', 'accession', 'source'
-* (Optional) the table can have a column called 'description' (or equivalently, 'function') which describes the annotation.
+* This table can have one of two formats. See above in the command line description (`mobmess visualize -h`) to understand the formats.
+* Here, we'll use a table with the columns 'contig', 'start', 'stop', 'direction', 'accession', 'source', 'description'
 * These tables can be generated using the [PlasX tutorial](https://github.com/michaelkyu/plasx#step-1-identify-genes-and-annotate-cogs-and-pfams-using-anvio) to annotate genes with COGs and Pfams (using anvi'o) and with de novo families (using MMseqs2)
 
 ```bash
